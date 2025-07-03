@@ -1,39 +1,42 @@
 export default async function handler(req, res) {
-  // Configuración para CORS
+  // Habilita CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // Manejar preflight
-  if (req.method === 'OPTIONS') {
+  // Manejo de preflight OPTIONS
+  if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  // Extraer el endpoint desde el query param
-  const { endpoint, ...restQuery } = req.query;
-  const url = `https://cotizador.socasesores.com/apipro/${endpoint ?? ''}`;
-
   try {
-    const response = await fetch(url, {
+    // Llama al endpoint original de SOC
+    const response = await fetch("https://cotizador.socasesores.com/apipro/", {
       method: req.method,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json"
       },
-      body: ['POST', 'PUT', 'PATCH'].includes(req.method)
-        ? JSON.stringify(req.body)
-        : undefined,
+      body: JSON.stringify(req.body)
     });
 
     const text = await response.text();
 
-    try {
-      const data = JSON.parse(text);
-      res.status(200).json(data);
-    } catch (e) {
-      res.status(200).send(text);
+    if (!text) {
+      console.error("❌ Respuesta vacía desde SOC");
+      return res.status(502).json({ error: "Respuesta vacía desde SOC" });
     }
+
+    try {
+      const json = JSON.parse(text);
+      return res.status(200).json(json);
+    } catch (e) {
+      console.warn("⚠️ La respuesta no es JSON, devolviendo texto plano.");
+      return res.status(200).send(text);
+    }
+
   } catch (err) {
-    console.error("❌ Error al llamar a SOC:", err);
-    res.status(500).json({ error: "Error desde el proxy a SOC" });
+    console.error("🔴 Error desde proxy:", err);
+    return res.status(500).json({ error: "Error desde el proxy" });
   }
 }
+
